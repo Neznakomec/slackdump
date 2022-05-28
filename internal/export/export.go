@@ -91,7 +91,29 @@ func (se *Export) messages(ctx context.Context, users slackdump.Users) error {
 		return fmt.Errorf("channels: error: %w", err)
 	}
 
+	// probably we need to filter out direct message conversations (which aren't channels)
+	// because they fail to be imported with official Slack import
+	var strict_official_slack_compatibility = true
+	if strict_official_slack_compatibility {
+		// save backup
+		serializeToFile(filepath.Join(se.dir, "channels_full.json.bak"), chans)
+		// filter
+		chans = filterOutStrangeChannels(chans)
+	}
 	return serializeToFile(filepath.Join(se.dir, "channels.json"), chans)
+}
+
+func filterOutStrangeChannels(chans []slack.Channel) []slack.Channel {
+	chansFiltered := []slack.Channel{}
+
+	for i := range chans {
+		if chans[i].Name != "" && chans[i].NameNormalized != "" {
+			chansFiltered = append(chansFiltered, chans[i])
+		} else {
+			dlog.Printf("Filter out a channel of: %s", chans[i].User)
+		}
+	}
+	return chansFiltered
 }
 
 func (se *Export) exportConversation(ctx context.Context, ch slack.Channel, users slackdump.Users, dl *downloader.Client) error {
